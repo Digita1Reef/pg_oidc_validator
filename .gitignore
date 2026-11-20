@@ -7,6 +7,11 @@
 /packaging/rpm/pg_oidc_validator-test.rpm
 
 # Test artifacts
+/claim_policy_test
+/verified_claims_test
+/identity_claims_test
+/oauth_conn_test
+/test/__pycache__/
 /test/pgdata/
 /test/*.log
 /test/.bundle/

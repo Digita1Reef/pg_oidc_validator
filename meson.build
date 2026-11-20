@@ -13,6 +13,7 @@ pg_oidc_validator_sources = files(
   'src/pg_oidc_validator.cpp',
   'src/http_client.cpp',
   'src/jwk.cpp',
+  'src/provisioning.cpp',
 )
 
 pg_oidc_validator = shared_module('pg_oidc_validator',
@@ -22,3 +23,6 @@ pg_oidc_validator = shared_module('pg_oidc_validator',
 )
 
 contrib_targets += pg_oidc_validator
+
+install_data('pg_oidc_identity.control', 'sql/pg_oidc_identity--1.0.sql',
+  kwargs: contrib_data_args)
