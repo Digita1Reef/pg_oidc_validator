@@ -135,7 +135,8 @@ bool reconcile(ProvisionRequest* request) {
 
   bool is_null = false;
   Datum result = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &is_null);
-  bool authorized = !is_null && DatumGetBool(result);
+  if (is_null) ereport(ERROR, (errmsg("OAuth provisioning returned an invalid result")));
+  bool authorized = DatumGetBool(result);
   SPI_finish();
   PopActiveSnapshot();
   if (!request_is_current(request)) ereport(ERROR, (errmsg("OAuth provisioning request expired")));
