@@ -111,6 +111,11 @@ inline picojson::object identity_request_at(const picojson::object& verified_pay
                                            std::int64_t now) {
   const auto tenant = normalized_uuid(string_claim(verified_payload, "tid"));
   if (tenant != normalized_uuid(expected_tenant)) reject();
+  // A tenant-shaped claim from another trusted OAuth provider is not proof of
+  // an Entra identity. Bind this policy's identity namespace to its authority.
+  const auto& issuer = string_claim(verified_payload, "iss");
+  if (issuer != "https://login.microsoftonline.com/" + tenant + "/v2.0" &&
+      issuer != "https://sts.windows.net/" + tenant + "/") reject();
   const auto object = normalized_uuid(string_claim(verified_payload, "oid"));
   const auto& username = string_claim(verified_payload, "preferred_username");
   validate_text(username, 63);

@@ -22,6 +22,7 @@ void check(bool condition, const char* description) {
 
 object valid_claims() {
   return {{"tid", value(tenant)}, {"oid", value(object_id)},
+          {"iss", value("https://login.microsoftonline.com/" + tenant + "/v2.0")},
           {"preferred_username", value(username)}, {"iat", value(now - 60)},
           {"exp", value(now + 300)},
           {"roles", value(array{value("reader"s), value("analyst"s)})}};
@@ -68,11 +69,23 @@ int main() try {
   auto unknown = valid_claims();
   unknown["unrelated"] = value(object{{"arbitrary", value(true)}});
   check(request(unknown) == accepted, "Unknown fields are allowed but never forwarded");
+  check(request(changed("iss", value("https://sts.windows.net/" + tenant + "/"))) == accepted,
+        "Accept the tenant-pinned Entra v1 authority");
+  for (const auto& issuer : {"https://issuer.example/"s,
+                             "https://login.microsoftonline.com/" + object_id + "/v2.0",
+                             "https://sts.windows.net/" + object_id + "/",
+                             "https://login.microsoftonline.com/common/v2.0"s,
+                             "https://login.microsoftonline.com/" + tenant + "/v2.0/",
+                             "https://login.microsoftonline.com/" + tenant + "/v2.0?issuer=entra",
+                             "https://login.microsoftonline.com.evil.invalid/" + tenant + "/v2.0",
+                             "http://login.microsoftonline.com/" + tenant + "/v2.0"}) {
+    rejects(changed("iss", value(issuer)), "Reject copied tenant claims from another issuer authority");
+  }
 
   rejects(valid_claims(), "Reject requested-role spoofing", "postgres");
   rejects(valid_claims(), "Role matching is case sensitive", "Person@example.invalid");
   rejects(valid_claims(), "Reject wrong expected tenant", username, object_id);
-  for (const char* key : {"tid", "oid", "preferred_username", "iat", "exp"}) {
+  for (const char* key : {"tid", "iss", "oid", "preferred_username", "iat", "exp"}) {
     auto claims = valid_claims();
     claims.erase(key);
     rejects(claims, "Reject missing required claims");
