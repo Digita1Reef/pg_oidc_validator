@@ -1,0 +1,34 @@
+name: PostgreSQL 18 native ARM64 validation
+on:
+  push:
+    branches: [validation/arm64]
+permissions:
+  contents: read
+jobs:
+  build-and-load:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Compile and test on ARM64
+        run: |
+          test "$(uname -m)" = aarch64
+          docker run --rm -v "$PWD:/src" -w /src postgres:18.4-trixie bash -euc '
+            apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends build-essential postgresql-server-dev-18 libcurl4-openssl-dev libssl-dev
+            /usr/lib/postgresql/18/bin/pg_config --version
+            make -j3 USE_PGXS=1 PG_CONFIG=/usr/lib/postgresql/18/bin/pg_config with_llvm=no all check-claims
+          '
+      - name: Load into PostgreSQL 18.4
+        run: |
+          docker run --name validator-test -d --network none -e POSTGRES_HOST_AUTH_METHOD=trust \
+            -v "$PWD/pg_oidc_validator.so:/usr/lib/postgresql/18/lib/pg_oidc_validator.so:ro" postgres:18.4-trixie
+          for attempt in $(seq 1 60); do
+            if docker exec validator-test pg_isready -U postgres; then break; fi
+            sleep 1
+          done
+          docker exec -i validator-test psql -X -v ON_ERROR_STOP=1 -U postgres <<'SQL'
+          SELECT version();
+          LOAD 'pg_oidc_validator';
+          SQL
