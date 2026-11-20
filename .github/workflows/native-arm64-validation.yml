@@ -22,8 +22,12 @@ jobs:
           '
       - name: Load into PostgreSQL 18.4
         run: |
+          docker build -t validator-runtime - <<'DOCKERFILE'
+          FROM postgres:18.4-trixie
+          RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends libcurl4t64 && rm -rf /var/lib/apt/lists/*
+          DOCKERFILE
           docker run --name validator-test -d --network none -e POSTGRES_HOST_AUTH_METHOD=trust \
-            -v "$PWD/pg_oidc_validator.so:/usr/lib/postgresql/18/lib/pg_oidc_validator.so:ro" postgres:18.4-trixie
+            -v "$PWD/pg_oidc_validator.so:/usr/lib/postgresql/18/lib/pg_oidc_validator.so:ro" validator-runtime
           for attempt in $(seq 1 60); do
             if docker exec validator-test pg_isready -U postgres; then break; fi
             sleep 1
