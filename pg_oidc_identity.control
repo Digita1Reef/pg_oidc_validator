@@ -1,0 +1,6 @@
+comment = 'Administrator-managed Entra identity and PostgreSQL permission reconciliation'
+default_version = '1.0'
+relocatable = false
+schema = 'oidc_identity'
+superuser = true
+trusted = false
