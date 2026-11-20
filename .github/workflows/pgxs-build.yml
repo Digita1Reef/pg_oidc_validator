@@ -90,3 +90,11 @@ jobs:
         PGBIN: /usr/local/pgsql/bin
         LD_LIBRARY_PATH: /usr/local/pgsql/lib
       run: /usr/bin/python3 test/hba_audience.py
+
+    - name: Verify individual identity provisioning and permissions
+      env:
+        PGBIN: /usr/local/pgsql/bin
+        LD_LIBRARY_PATH: /usr/local/pgsql/lib
+      run: |
+        /usr/bin/python3 test/identity_provisioning.py
+        /usr/bin/python3 test/identity_worker_failures.py

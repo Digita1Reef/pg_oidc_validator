@@ -5,7 +5,6 @@
 #include "pg_utils.hpp"
 
 extern "C" {
-#include "postgres.h"
 #include "access/xact.h"
 #include "access/xlog.h"
 #include "catalog/pg_database.h"
@@ -13,6 +12,7 @@ extern "C" {
 #include "executor/spi.h"
 #include "miscadmin.h"
 #include "port/atomics.h"
+#include "postgres.h"
 #include "postmaster/bgworker.h"
 #include "postmaster/postmaster.h"
 #include "storage/dsm.h"
@@ -119,7 +119,8 @@ bool reconcile(ProvisionRequest* request) {
   if (!HeapTupleIsValid(database)) ereport(ERROR, (errmsg("OAuth provisioning database is unavailable")));
   bool is_template = reinterpret_cast<Form_pg_database>(GETSTRUCT(database))->datistemplate;
   ReleaseSysCache(database);
-  if (is_template || RecoveryInProgress()) ereport(ERROR, (errmsg("OAuth provisioning requires a writable management database")));
+  if (is_template || RecoveryInProgress())
+    ereport(ERROR, (errmsg("OAuth provisioning requires a writable management database")));
 
   if (SPI_connect() != SPI_OK_CONNECT) ereport(ERROR, (errmsg("OAuth provisioning initialization failed")));
   if (SPI_execute("SET LOCAL search_path = pg_catalog", false, 0) != SPI_OK_UTILITY)
@@ -127,10 +128,9 @@ bool reconcile(ProvisionRequest* request) {
 
   Oid argument_types[] = {TEXTOID};
   Datum arguments[] = {CStringGetTextDatum(request->json)};
-  if (SPI_execute_with_args("SELECT oidc_identity.reconcile($1::jsonb)", 1, argument_types, arguments, nullptr,
-                            false, 1) != SPI_OK_SELECT ||
-      SPI_processed != 1 || SPI_tuptable == nullptr ||
-      SPI_gettypeid(SPI_tuptable->tupdesc, 1) != BOOLOID)
+  if (SPI_execute_with_args("SELECT oidc_identity.reconcile($1::jsonb)", 1, argument_types, arguments, nullptr, false,
+                            1) != SPI_OK_SELECT ||
+      SPI_processed != 1 || SPI_tuptable == nullptr || SPI_gettypeid(SPI_tuptable->tupdesc, 1) != BOOLOID)
     ereport(ERROR, (errmsg("OAuth provisioning returned an invalid result")));
 
   bool is_null = false;

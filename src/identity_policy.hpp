@@ -85,9 +85,9 @@ inline void validate_text(std::string_view input, std::size_t maximum_bytes) {
       if ((next & 0xc0) != 0x80) reject();
       codepoint = (codepoint << 6) | (next & 0x3f);
     }
-    if (codepoint < minimum || codepoint > 0x10ffff ||
-        (codepoint >= 0xd800 && codepoint <= 0xdfff) || codepoint < 0x20 ||
-        (codepoint >= 0x7f && codepoint <= 0x9f)) reject();
+    if (codepoint < minimum || codepoint > 0x10ffff || (codepoint >= 0xd800 && codepoint <= 0xdfff) ||
+        codepoint < 0x20 || (codepoint >= 0x7f && codepoint <= 0x9f))
+      reject();
   }
 }
 
@@ -101,21 +101,21 @@ inline std::int64_t timestamp_claim(const picojson::object& claims, const char* 
   if (!value.is<double>()) reject();
   const auto number = value.get<double>();
   if (!std::isfinite(number) || number < 0 || number > static_cast<double>(maximum_exact_integer) ||
-      std::trunc(number) != number) reject();
+      std::trunc(number) != number)
+    reject();
   return static_cast<std::int64_t>(number);
 }
 
-inline picojson::object identity_request_at(const picojson::object& verified_payload,
-                                           std::string_view expected_tenant,
-                                           std::string_view requested_role,
-                                           std::int64_t now) {
+inline picojson::object identity_request_at(const picojson::object& verified_payload, std::string_view expected_tenant,
+                                            std::string_view requested_role, std::int64_t now) {
   const auto tenant = normalized_uuid(string_claim(verified_payload, "tid"));
   if (tenant != normalized_uuid(expected_tenant)) reject();
   // A tenant-shaped claim from another trusted OAuth provider is not proof of
   // an Entra identity. Bind this policy's identity namespace to its authority.
   const auto& issuer = string_claim(verified_payload, "iss");
   if (issuer != "https://login.microsoftonline.com/" + tenant + "/v2.0" &&
-      issuer != "https://sts.windows.net/" + tenant + "/") reject();
+      issuer != "https://sts.windows.net/" + tenant + "/")
+    reject();
   const auto object = normalized_uuid(string_claim(verified_payload, "oid"));
   const auto& username = string_claim(verified_payload, "preferred_username");
   validate_text(username, 63);
@@ -123,8 +123,8 @@ inline picojson::object identity_request_at(const picojson::object& verified_pay
 
   const auto issued_at = timestamp_claim(verified_payload, "iat");
   const auto expires_at = timestamp_claim(verified_payload, "exp");
-  if (now < 0 || now > maximum_exact_integer || issued_at > now || expires_at <= now ||
-      expires_at <= issued_at) reject();
+  if (now < 0 || now > maximum_exact_integer || issued_at > now || expires_at <= now || expires_at <= issued_at)
+    reject();
 
   std::set<std::string> role_names;
   if (const auto claim = verified_payload.find("roles"); claim != verified_payload.end()) {
@@ -141,12 +141,9 @@ inline picojson::object identity_request_at(const picojson::object& verified_pay
 
   picojson::array roles;
   for (const auto& name : role_names) roles.emplace_back(name);
-  picojson::object request{{"tenant_id", picojson::value(tenant)},
-                           {"object_id", picojson::value(object)},
-                           {"username", picojson::value(username)},
-                           {"issued_at", picojson::value(issued_at)},
-                           {"expires_at", picojson::value(expires_at)},
-                           {"roles", picojson::value(roles)}};
+  picojson::object request{{"tenant_id", picojson::value(tenant)},      {"object_id", picojson::value(object)},
+                           {"username", picojson::value(username)},     {"issued_at", picojson::value(issued_at)},
+                           {"expires_at", picojson::value(expires_at)}, {"roles", picojson::value(roles)}};
   if (picojson::value(request).serialize().size() > maximum_request_bytes) reject();
   return request;
 }
@@ -157,11 +154,10 @@ inline picojson::object identity_request_at(const picojson::object& verified_pay
 // scopes have been verified. Missing/empty roles intentionally reaches the
 // reconciliation worker so it can remove prior managed memberships and deny
 // login. No raw token or unrecognized claim is forwarded to the worker.
-inline picojson::object identity_request(const picojson::object& verified_payload,
-                                        std::string_view expected_tenant,
-                                        std::string_view requested_role) {
-  const auto now = std::chrono::duration_cast<std::chrono::seconds>(
-                       std::chrono::system_clock::now().time_since_epoch()).count();
+inline picojson::object identity_request(const picojson::object& verified_payload, std::string_view expected_tenant,
+                                         std::string_view requested_role) {
+  const auto now =
+      std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
   return identity_policy_detail::identity_request_at(verified_payload, expected_tenant, requested_role, now);
 }
 

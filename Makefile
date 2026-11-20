@@ -1,14 +1,17 @@
 MODULE_big = pg_oidc_validator
+EXTENSION = pg_oidc_identity
+DATA = sql/pg_oidc_identity--1.0.sql
 PGFILEDESC = "pg_oidc_validator - OAuth token validation for PostgreSQL"
 
 OBJS = \
 	src/pg_oidc_validator.o \
 	src/http_client.o \
-	src/jwk.o
+	src/jwk.o \
+	src/provisioning.o
 
 PG_CPPFLAGS = -Ijwt-cpp/include -std=c++23
 
-EXTRA_CLEAN += claim_policy_test verified_claims_test
+EXTRA_CLEAN += claim_policy_test verified_claims_test identity_claims_test
 
 USE_PGXS ?= 0
 
@@ -40,12 +43,14 @@ src/oauth_conn_test.o: src/oauth_conn_test.cpp
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -I$(includedir) -std=c++23 -c -o $@ $<
 
 .PHONY: check-claims
-check-claims: claim_policy_test verified_claims_test
+check-claims: claim_policy_test verified_claims_test identity_claims_test
 	./claim_policy_test
 	./verified_claims_test
+	./identity_claims_test
 
 claim_policy_test: test/claim_policy.cpp src/jwk.o
 verified_claims_test: test/verified_claims.cpp src/jwk.o
+identity_claims_test: test/identity_claims.cpp
 
-claim_policy_test verified_claims_test:
+claim_policy_test verified_claims_test identity_claims_test:
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(PG_CPPFLAGS) -Isrc -o $@ $^ -lcrypto -lssl

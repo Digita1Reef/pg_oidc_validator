@@ -1,8 +1,8 @@
-#include "identity_policy.hpp"
-
 #include <cstdlib>
 #include <iostream>
 #include <limits>
+
+#include "identity_policy.hpp"
 
 using picojson::array;
 using picojson::object;
@@ -21,9 +21,11 @@ void check(bool condition, const char* description) {
 }
 
 object valid_claims() {
-  return {{"tid", value(tenant)}, {"oid", value(object_id)},
+  return {{"tid", value(tenant)},
+          {"oid", value(object_id)},
           {"iss", value("https://login.microsoftonline.com/" + tenant + "/v2.0")},
-          {"preferred_username", value(username)}, {"iat", value(now - 60)},
+          {"preferred_username", value(username)},
+          {"iat", value(now - 60)},
           {"exp", value(now + 300)},
           {"roles", value(array{value("reader"s), value("analyst"s)})}};
 }
@@ -71,14 +73,13 @@ int main() try {
   check(request(unknown) == accepted, "Unknown fields are allowed but never forwarded");
   check(request(changed("iss", value("https://sts.windows.net/" + tenant + "/"))) == accepted,
         "Accept the tenant-pinned Entra v1 authority");
-  for (const auto& issuer : {"https://issuer.example/"s,
-                             "https://login.microsoftonline.com/" + object_id + "/v2.0",
-                             "https://sts.windows.net/" + object_id + "/",
-                             "https://login.microsoftonline.com/common/v2.0"s,
-                             "https://login.microsoftonline.com/" + tenant + "/v2.0/",
-                             "https://login.microsoftonline.com/" + tenant + "/v2.0?issuer=entra",
-                             "https://login.microsoftonline.com.evil.invalid/" + tenant + "/v2.0",
-                             "http://login.microsoftonline.com/" + tenant + "/v2.0"}) {
+  for (const auto& issuer :
+       {"https://issuer.example/"s, "https://login.microsoftonline.com/" + object_id + "/v2.0",
+        "https://sts.windows.net/" + object_id + "/", "https://login.microsoftonline.com/common/v2.0"s,
+        "https://login.microsoftonline.com/" + tenant + "/v2.0/",
+        "https://login.microsoftonline.com/" + tenant + "/v2.0?issuer=entra",
+        "https://login.microsoftonline.com.evil.invalid/" + tenant + "/v2.0",
+        "http://login.microsoftonline.com/" + tenant + "/v2.0"}) {
     rejects(changed("iss", value(issuer)), "Reject copied tenant claims from another issuer authority");
   }
 
@@ -92,10 +93,8 @@ int main() try {
     rejects(changed(key, value(true)), "Reject wrong required claim type");
     rejects(changed(key, value()), "Reject null required claims");
   }
-  for (const auto& bad : {"00112233445566778899aabbccddeeff"s,
-                          "00112233-4455-6677-8899-aabbccddeefg"s,
-                          "{00112233-4455-6677-8899-aabbccddeeff}"s,
-                          "00112233_4455-6677-8899-aabbccddeeff"s}) {
+  for (const auto& bad : {"00112233445566778899aabbccddeeff"s, "00112233-4455-6677-8899-aabbccddeefg"s,
+                          "{00112233-4455-6677-8899-aabbccddeeff}"s, "00112233_4455-6677-8899-aabbccddeeff"s}) {
     rejects(changed("tid", value(bad)), "Reject malformed tenant ID");
     rejects(changed("oid", value(bad)), "Reject malformed object ID");
   }
@@ -108,7 +107,8 @@ int main() try {
   // Punctuation must survive unchanged for the worker to quote as identifiers.
   const auto quoted_name = "a\"';DROP ROLE postgres;--"s;
   check(request(changed("preferred_username", value(quoted_name)), quoted_name).at("username").get<std::string>() ==
-            quoted_name, "Preserve SQL punctuation as data");
+            quoted_name,
+        "Preserve SQL punctuation as data");
   std::string unicode;
   for (int i = 0; i < 31; ++i) unicode += "\xc3\xa9";
   const auto unicode63 = unicode + "x";
@@ -116,8 +116,8 @@ int main() try {
         "Measure Unicode username limit in bytes");
   unicode += "\xc3\xa9";
   rejects(changed("preferred_username", value(unicode)), "Reject Unicode username above byte limit", unicode);
-  for (const auto& bad : {"a\nb"s, "a\0b"s, "a\x7f"s, "\xc2\x85"s, "\xc0\x80"s,
-                          "\xed\xa0\x80"s, "\xf4\x90\x80\x80"s, "\xe2\x82"s, "\x80"s}) {
+  for (const auto& bad : {"a\nb"s, "a\0b"s, "a\x7f"s, "\xc2\x85"s, "\xc0\x80"s, "\xed\xa0\x80"s, "\xf4\x90\x80\x80"s,
+                          "\xe2\x82"s, "\x80"s}) {
     rejects(changed("preferred_username", value(bad)), "Reject control characters or invalid UTF-8", bad);
     rejects(changed("roles", value(array{value(bad)})), "Reject controls or invalid UTF-8 in roles");
   }
@@ -146,11 +146,10 @@ int main() try {
   check(request(missing_roles).at("roles").get<array>().empty(), "Missing roles must reach revocation worker");
   check(request(changed("roles", value(array{}))).at("roles").get<array>().empty(),
         "Empty roles must reach revocation worker");
-  for (const auto& bad : {value(), value(true), value("reader"s), value(object{}),
-                          value(array{value(true)}), value(array{value()}),
-                          value(array{value(array{})}), value(array{value(object{})}),
-                          value(array{value(""s)}), value(array{value(std::string(121, 'x'))}),
-                          value(array{value("reader"s), value("reader"s)})}) {
+  for (const auto& bad :
+       {value(), value(true), value("reader"s), value(object{}), value(array{value(true)}), value(array{value()}),
+        value(array{value(array{})}), value(array{value(object{})}), value(array{value(""s)}),
+        value(array{value(std::string(121, 'x'))}), value(array{value("reader"s), value("reader"s)})}) {
     rejects(changed("roles", bad), "Reject malformed or duplicate roles");
   }
   array maximum_roles;
@@ -165,8 +164,8 @@ int main() try {
   maximum_roles.emplace_back("overflow"s);
   rejects(changed("roles", value(maximum_roles)), "Reject more than 128 roles");
 
-  const auto live_now = std::chrono::duration_cast<std::chrono::seconds>(
-                            std::chrono::system_clock::now().time_since_epoch()).count();
+  const auto live_now =
+      std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
   auto live_claims = valid_claims();
   live_claims["iat"] = value(std::int64_t(live_now - 60));
   live_claims["exp"] = value(std::int64_t(live_now + 300));

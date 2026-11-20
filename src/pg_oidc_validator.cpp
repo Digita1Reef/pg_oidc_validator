@@ -8,7 +8,9 @@
 
 #include "http_cache.hpp"
 #include "http_client.hpp"
+#include "identity_policy.hpp"
 #include "jwk.hpp"
+#include "provisioning.hpp"
 
 static const char* ModuleName = "pg_oidc_validator";
 static const char* ModuleVersion = "1.1.0";
@@ -64,11 +66,16 @@ const OAuthValidatorCallbacks* _PG_oauth_validator_module_init(void) { return &v
 }
 
 static char* authn_field = nullptr;
+static char* identity_tenant = nullptr;
 
 // When non-empty, the validator uses this URL (instead of pg_hba's `issuer=`)
 static char* discovery_url_override = nullptr;
 
 extern "C" void _PG_init() {
+  oidc::register_provisioning_settings();
+  DefineCustomStringVariable("pg_oidc_validator.identity_tenant",
+                             gettext_noop("Tenant UUID allowed to provision individual PostgreSQL identities."),
+                             nullptr, &identity_tenant, "", PGC_SIGHUP, 0, nullptr, nullptr, nullptr);
 #if PG_VERSION_NUM < 190000
   DefineCustomStringVariable("pg_oidc_validator.audience",
                              gettext_noop("Expected audience of access tokens for this PostgreSQL server."), nullptr,
@@ -97,7 +104,12 @@ bool validate_token(const ValidatorModuleState* state, const char* token, const 
          audience_setting);
     return false;
   }
-  if (MyProcPort->hba->oauth_skip_usermap) {
+  const bool provision = oidc::provisioning_enabled() && MyProcPort->hba->oauth_skip_usermap;
+  if (provision && (identity_tenant == nullptr || *identity_tenant == '\0')) {
+    elog(WARNING, "Identity provisioning requires a pinned tenant and delegate_ident_mapping=1");
+    return false;
+  }
+  if (!provision && MyProcPort->hba->oauth_skip_usermap) {
     elog(WARNING, "pg_oidc_validator requires PostgreSQL identity mapping");
     return false;
   }
@@ -146,6 +158,15 @@ bool validate_token(const ValidatorModuleState* state, const char* token, const 
   const auto payload = decoded_token.get_payload_json();
   if (!token_scopes_match(issuer, required_scopes, payload)) {
     elog(LOG, "OAuth access token does not grant the configured scopes");
+    return true;
+  }
+
+  if (provision) {
+    const auto request = oidc::identity_request(payload, identity_tenant, role == nullptr ? "" : role);
+    if (!oidc::provision_identity(picojson::value(request).serialize())) return true;
+    const auto identity = request.at("tenant_id").get<std::string>() + ":" + request.at("object_id").get<std::string>();
+    res->authn_id = pg::pg_try([&]() { return pstrdup(identity.c_str()); });
+    res->authorized = true;
     return true;
   }
 
