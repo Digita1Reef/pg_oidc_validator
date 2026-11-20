@@ -56,6 +56,10 @@ jobs:
         sudo mkdir pg-oidc-validator-pgdg18
         sudo mkdir -p pg-oidc-validator-pgdg18/usr/lib/postgresql/18/lib/
         sudo cp /usr/lib/postgresql/18/lib/pg_oidc_validator* pg-oidc-validator-pgdg18/usr/lib/postgresql/18/lib/
+        sudo mkdir -p pg-oidc-validator-pgdg18/usr/share/postgresql/18/extension/
+        sudo cp /usr/share/postgresql/18/extension/pg_oidc_identity.control \
+          /usr/share/postgresql/18/extension/pg_oidc_identity--1.0.sql \
+          pg-oidc-validator-pgdg18/usr/share/postgresql/18/extension/
 
     - name: Upload tgz
       uses: actions/upload-artifact@v7
@@ -76,7 +80,11 @@ jobs:
     - name: Test deb
       run: |
         sudo rm -rf /usr/lib/postgresql/18/lib/pg_oidc_validator*
+        sudo rm /usr/share/postgresql/18/extension/pg_oidc_identity.control \
+          /usr/share/postgresql/18/extension/pg_oidc_identity--1.0.sql
         sudo dpkg -i --debug=7777 pg-oidc-validator-pgdg18.deb
+        test -f /usr/share/postgresql/18/extension/pg_oidc_identity.control
+        test -f /usr/share/postgresql/18/extension/pg_oidc_identity--1.0.sql
 
     - name: Upload deb
       uses: actions/upload-artifact@v7

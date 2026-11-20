@@ -40,6 +40,8 @@ make USE_PGXS=1 install DESTDIR=%{buildroot} with_llvm=no COMPILER='g++ $(CXXFLA
 %license LICENSE.txt
 %doc README.md
 /usr/pgsql-18/lib/pg_oidc_validator.so
+/usr/pgsql-18/share/extension/pg_oidc_identity.control
+/usr/pgsql-18/share/extension/pg_oidc_identity--1.0.sql
 
 %changelog
 * Thu Feb 10 2026 Percona <info@percona.com> - 0.2-1
